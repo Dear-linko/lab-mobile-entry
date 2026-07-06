@@ -1,0 +1,9 @@
+{
+  "name": "实验数据手机录入",
+  "short_name": "实验录入",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f2f5f8",
+  "theme_color": "#1f6feb",
+  "icons": []
+}

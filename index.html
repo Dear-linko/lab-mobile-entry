@@ -1,0 +1,959 @@
+<!doctype html><html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>手机实验录入</title>
+<style>
+:root {
+    --line: #d8dee6;
+    --ink: #1c2733;
+    --muted: #66788c;
+    --brand: #1f6feb;
+    --bg: #f2f5f8;
+    --card: #ffffff;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 15px;
+    /* 底部固定导出条的让位 */
+    padding-bottom: 76px;
+}
+.offline-header {
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    padding: 14px 16px 10px;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+.offline-header h1 { margin: 0; font-size: 18px; }
+.offline-header-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+#offline-meta { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+#offline-clear { background: none; border: none; color: var(--muted); font-size: 12px; padding: 4px; text-decoration: underline; }
+.offline-header-actions { display: flex; gap: 8px; margin-top: 8px; }
+.offline-header-actions button {
+    flex: 1; padding: 8px; border-radius: 8px; font: inherit; font-size: 13px;
+    background: var(--bg); border: 1px solid var(--line); color: var(--ink);
+}
+
+.offline-panel {
+    position: fixed; inset: 0; z-index: 15; background: rgba(20, 28, 38, 0.5);
+    display: flex; align-items: flex-end;
+}
+.offline-panel[hidden] { display: none; }
+.offline-panel-card {
+    background: var(--card); border-radius: 12px 12px 0 0; padding: 16px 14px;
+    width: 100%; max-height: 80vh; overflow-y: auto;
+}
+.offline-panel-card h3 { margin: 0 0 6px; font-size: 16px; }
+.offline-panel-card p { margin: 0 0 10px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.offline-panel-card textarea {
+    width: 100%; font-size: 12px; border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px; color: var(--ink);
+}
+.offline-panel-hint { min-height: 1em; }
+.offline-panel-actions { display: flex; gap: 8px; margin-top: 10px; }
+.offline-panel-actions button {
+    flex: 1; padding: 10px; border-radius: 8px; font: inherit; font-size: 14px;
+    background: #fff; border: 1px solid var(--line); color: var(--ink);
+}
+.offline-panel-actions button.is-primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+#offline-scan-area { margin-top: 10px; }
+#offline-scan-video { width: 100%; border-radius: 8px; background: #000; }
+.offline-banner { margin: 10px 12px 0; padding: 10px 12px; border-radius: 8px; font-size: 13px; line-height: 1.5; }
+.offline-banner.is-warn { background: #fff6e0; border: 1px solid #e8c46a; color: #7a5b12; }
+.offline-banner.is-info { background: #e8f1fd; border: 1px solid #b3cff5; color: #1d4f91; }
+.offline-fatal { margin: 40px 16px; text-align: center; color: #a03030; }
+.offline-empty { margin: 40px 16px; text-align: center; color: var(--muted); }
+
+#offline-record-list { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.offline-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.offline-card-head {
+    display: flex; flex-direction: column; gap: 4px; width: 100%;
+    padding: 12px 14px; background: none; border: none; text-align: left;
+    font: inherit; color: inherit;
+}
+.offline-card.is-expanded .offline-card-head { border-bottom: 1px solid var(--line); }
+.offline-card-id { font-weight: 600; font-size: 15px; word-break: break-all; }
+.offline-card-meta { display: flex; flex-wrap: wrap; gap: 6px; color: var(--muted); font-size: 12px; }
+.offline-card-meta span { background: var(--bg); border-radius: 4px; padding: 1px 6px; }
+.offline-badge { display: inline-block; font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 10px; }
+.offline-badge.is-filled { color: #1a7f37; border-color: #9fd4ae; background: #eefaf1; }
+.offline-card-body { padding: 4px 14px 14px; }
+.offline-form-error { color: #a03030; }
+
+.offline-band h4 {
+    margin: 14px 0 6px; font-size: 13px; color: var(--brand);
+    border-left: 3px solid var(--brand); padding-left: 8px;
+}
+.offline-parallel { border: 1px dashed var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+.offline-parallel h5 { margin: 0 0 6px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.fld { display: block; margin: 8px 0; }
+.fld > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 3px; }
+.fld-unit { color: #9aa8b8; }
+.fld-required { color: #c0392b; font-style: normal; }
+.fld input, .fld select {
+    width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px;
+    font: inherit; font-size: 16px; /* 16px 避免 iOS 聚焦自动放大 */
+    background: #fff; color: var(--ink);
+}
+.fld input:focus, .fld select:focus { outline: none; border-color: var(--brand); }
+.fld-calc { background: var(--bg) !important; color: var(--muted); }
+
+.offline-footer {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    display: flex; gap: 10px; padding: 12px 14px;
+    background: var(--card); border-top: 1px solid var(--line);
+}
+.offline-footer button {
+    flex: 1; padding: 12px; border-radius: 10px; font: inherit; font-size: 15px;
+}
+#offline-export { background: var(--brand); border: 1px solid var(--brand); color: #fff; font-weight: 600; }
+#offline-copy { background: #fff; border: 1px solid var(--line); color: var(--ink); }
+
+#offline-copy-panel {
+    position: fixed; inset: 0; z-index: 10; background: rgba(20, 28, 38, 0.5);
+    display: flex; align-items: flex-end;
+}
+/* display:flex 会盖掉 hidden 属性的 UA 样式,显式补回 */
+#offline-copy-panel[hidden] { display: none; }
+.offline-copy-card { background: var(--card); border-radius: 12px 12px 0 0; padding: 14px; width: 100%; }
+.offline-copy-card p { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.offline-copy-card textarea {
+    width: 100%; height: 130px; font-size: 12px; border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px; color: var(--ink);
+}
+.offline-copy-close { margin-top: 8px; width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font: inherit; }
+
+#offline-toast {
+    position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); z-index: 20;
+    background: rgba(28, 39, 51, 0.92); color: #fff; font-size: 13px;
+    padding: 9px 16px; border-radius: 999px; max-width: 86vw; text-align: center;
+}
+</style>
+
+<link rel="manifest" href="manifest.webmanifest">
+<script>
+if (location.protocol === "https:" && "serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+</script>
+</head>
+<body>
+<header class="offline-header">
+    <div class="offline-header-row">
+        <h1>手机实验录入</h1>
+        <button id="offline-clear" type="button">清除本页草稿</button>
+    </div>
+    <p id="offline-meta"></p>
+    <div class="offline-header-actions">
+        <button id="offline-load-open" type="button">装载数据</button>
+        <button id="offline-manual-open" type="button">手动新增</button>
+    </div>
+</header>
+
+<div class="offline-panel" id="offline-load-panel" hidden>
+    <div class="offline-panel-card">
+        <h3>装载数据</h3>
+        <p>在电脑「手机同步」页生成装载二维码后：直接「扫码装载」，或用微信扫一扫识别出文本、复制后粘贴到下框（多个码的文本连着粘即可）。</p>
+        <textarea id="offline-load-text" rows="4" placeholder="SCINF|1|2|…"></textarea>
+        <p class="offline-panel-hint" id="offline-load-scan-hint"></p>
+        <div class="offline-panel-actions">
+            <button id="offline-load-scan" type="button">扫码装载</button>
+            <button id="offline-load-parse" type="button" class="is-primary">装载粘贴的文本</button>
+        </div>
+        <p class="offline-panel-hint" id="offline-load-status"></p>
+        <div id="offline-scan-area" hidden>
+            <video id="offline-scan-video" playsinline muted></video>
+        </div>
+        <div class="offline-panel-actions">
+            <button id="offline-load-reset" type="button" hidden>清除已装载的数据</button>
+            <button id="offline-load-close" type="button">关闭</button>
+        </div>
+    </div>
+</div>
+
+<div class="offline-panel" id="offline-manual-panel" hidden>
+    <div class="offline-panel-card">
+        <h3>手动新增记录</h3>
+        <p>待录清单里没有的样品可手动录入。编号请与电脑端「单号-样品编号」一致，导入时会自动关联或新建草稿。</p>
+        <label class="fld"><span>单号-样品编号</span><input type="text" id="offline-manual-id" placeholder="例如 SC2607-001-1"></label>
+        <label class="fld"><span>字段模板</span><select id="offline-manual-template"></select></label>
+        <div class="offline-panel-actions">
+            <button id="offline-manual-close" type="button">取消</button>
+            <button id="offline-manual-add" type="button" class="is-primary">新增</button>
+        </div>
+    </div>
+</div>
+<div id="offline-banners"></div>
+<main id="offline-record-list"></main>
+<footer class="offline-footer">
+    <button id="offline-copy" type="button">复制为文本</button>
+    <button id="offline-export" type="button">导出记录文件</button>
+</footer>
+<div id="offline-copy-panel" hidden>
+    <div class="offline-copy-card">
+        <p>已生成记录文本。若自动复制失败,请长按下方内容全选复制,回到电脑端粘贴进「手机同步」页的导入文本框。</p>
+        <textarea readonly></textarea>
+        <button class="offline-copy-close" type="button">关闭</button>
+    </div>
+</div>
+<div id="offline-toast" hidden></div>
+<script id="offline-bootstrap" type="application/json">{"format": "sc-inf-offline-page", "generated_at": "", "generated_by": {"employee_id": "", "name": ""}, "records": [], "shell": true, "templates": [], "version": 1}</script>
+<script>// 实验数据登记:计算字段公式引擎(移植自 xtc-registration-system,与服务端
+// _experiment_logic.py 同一文法/语义;前端负责录入时的即时显示,服务端保存时权威重算)
+// 公式存储格式:{字段id} 参与四则运算,如 "({poleMass} - {baseMass}) * {ratio}"
+(() => {
+    function hasValue(v) { return v !== undefined && v !== null && v !== ""; }
+
+    function parseFormula(src) {
+        const s = String(src || "");
+        let i = 0;
+        function ws() { while (i < s.length && /\s/.test(s[i])) i++; }
+        function expr() {
+            let node = term();
+            for (;;) { ws(); const c = s[i]; if (c === "+" || c === "-") { i++; node = { op: c, l: node, r: term() }; } else break; }
+            return node;
+        }
+        function term() {
+            let node = factor();
+            for (;;) { ws(); const c = s[i]; if (c === "*" || c === "/") { i++; node = { op: c, l: node, r: factor() }; } else break; }
+            return node;
+        }
+        function factor() {
+            ws();
+            const c = s[i];
+            if (c === "(") { i++; const node = expr(); ws(); if (s[i] !== ")") throw new Error("缺少右括号"); i++; return node; }
+            if (c === "-") { i++; return { op: "neg", l: factor() }; }
+            if (c === "+") { i++; return factor(); }
+            if (c === "{") {
+                const j = s.indexOf("}", i);
+                if (j < 0) throw new Error("字段引用缺少 }");
+                const id = s.slice(i + 1, j).trim();
+                if (!id) throw new Error("存在空的字段引用");
+                i = j + 1;
+                return { ref: id };
+            }
+            const m = /^\d+(?:\.\d+)?/.exec(s.slice(i));
+            if (m) { i += m[0].length; return { num: parseFloat(m[0]) }; }
+            throw new Error(i >= s.length ? "公式不完整" : "无法识别的字符「" + s[i] + "」");
+        }
+        ws();
+        if (i >= s.length) throw new Error("公式为空");
+        const ast = expr();
+        ws();
+        if (i < s.length) throw new Error("无法识别的字符「" + s[i] + "」");
+        return ast;
+    }
+
+    function formulaRefs(ast, out = []) {
+        if (!ast) return out;
+        if (ast.ref) out.push(ast.ref);
+        if (ast.l) formulaRefs(ast.l, out);
+        if (ast.r) formulaRefs(ast.r, out);
+        return out;
+    }
+
+    // 求值:返回 number;任一输入缺失返回 null;除零/引用失效等错误返回 NaN
+    function evalAst(ast, valueOf) {
+        if (ast.num !== undefined) return ast.num;
+        if (ast.ref) return valueOf(ast.ref);
+        if (ast.op === "neg") { const v = evalAst(ast.l, valueOf); return v === null ? null : -v; }
+        const a = evalAst(ast.l, valueOf); if (a === null) return null;
+        const b = evalAst(ast.r, valueOf); if (b === null) return null;
+        switch (ast.op) { case "+": return a + b; case "-": return a - b; case "*": return a * b; case "/": return a / b; }
+        return NaN;
+    }
+
+    function fieldById(id, fields) { return fields.find((f) => f.id === id); }
+
+    // 针对一条样品构造取值函数:输入字段本样优先、回落组级 shared(历史遗留值);计算字段递归求值(带缓存与防环)
+    function makeValueOf(shared, sample, fields) {
+        shared = shared || {};
+        sample = sample || {};
+        const memo = Object.create(null);
+        const visiting = new Set();
+        return function valueOf(id) {
+            const f = fieldById(id, fields);
+            if (!f) return NaN;
+            if (f.type !== "calc") {
+                const v = hasValue(sample[f.id]) ? sample[f.id] : shared[f.id];
+                if (!hasValue(v)) return null;
+                const n = typeof v === "number" ? v : parseFloat(v);
+                return isNaN(n) ? null : n;
+            }
+            if (id in memo) return memo[id];
+            if (visiting.has(id)) return NaN;
+            visiting.add(id);
+            let r;
+            try { r = evalAst(parseFormula(f.formula), valueOf); }
+            catch (e) { r = NaN; }
+            visiting.delete(id);
+            memo[id] = r;
+            return r;
+        };
+    }
+
+    function formatNumber(v, decimals) {
+        if (v === undefined || v === null || v === "") return "";
+        const n = typeof v === "number" ? v : parseFloat(v);
+        if (isNaN(n)) return "";
+        return decimals !== null && decimals !== undefined ? n.toFixed(decimals) : String(n);
+    }
+
+    // 公式在编辑器里显示为 [字段名],保存时转回 {id},避免字段改名弄坏公式
+    function formulaToDisplayText(formula, fields) {
+        return String(formula || "").replace(/\{([^}]+)\}/g, (m, id) => {
+            const f = fieldById(id.trim(), fields);
+            return "[" + (f ? f.name : id.trim()) + "]";
+        });
+    }
+
+    function displayTextToFormula(text, fields) {
+        return String(text || "").replace(/\[([^\]]+)\]/g, (m, name) => {
+            const f = fields.find((x) => x.name === name.trim());
+            return "{" + (f ? f.id : name.trim()) + "}";
+        });
+    }
+
+    window.ExperimentFormula = {
+        hasValue,
+        parseFormula,
+        formulaRefs,
+        evalAst,
+        fieldById,
+        makeValueOf,
+        formatNumber,
+        formulaToDisplayText,
+        displayTextToFormula,
+    };
+})();
+</script>
+<script>// 手机离线录入页逻辑。本文件在服务端渲染离线页时被整体内联进单文件
+// HTML(见 _mobile_routes.py 的 _inline_js),运行环境是手机浏览器的
+// file:// 页面:零网络、零外部资源,草稿存 localStorage,导出走 Blob
+// 下载或「复制为文本」。
+//
+// 两种形态(同一份代码):
+// - 完整版(/mobile/offline-page):模板+待录记录随页面嵌入,适合能把
+//   文件拷进手机的场景;
+// - 空壳版(/mobile/offline-shell):不含任何公司数据,经私人渠道装到
+//   手机一次,之后扫电脑 /mobile 页的装载二维码(SCINF|i|n|分块,
+//   zlib+base64)或粘贴扫码文本来装载数据,装载结果持久在 localStorage。
+//
+// 用户输入只写进 draft(稳定键,按 group_id/sample_id 索引,换数据不丢),
+// 嵌入/装载的数据永不改动;导出时仅带用户在手机上填过的字段。
+(() => {
+    const EF = window.ExperimentFormula;
+
+    const LOADED_KEY = "scInfOffline:loaded";
+    const MANUAL_KEY = "scInfOffline:manual";
+    const DRAFT_KEY = "scInfOffline:draft";
+
+    function escapeHtml(text) {
+        return String(text === undefined || text === null ? "" : text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function fatal(message) {
+        document.body.innerHTML = '<div class="offline-fatal">' + escapeHtml(message) + "</div>";
+    }
+
+    let embedded = null;
+    try { embedded = JSON.parse(document.getElementById("offline-bootstrap").textContent); } catch (e) { /* 下面统一处理 */ }
+    if (!embedded || !EF) {
+        fatal("页面数据损坏,请在电脑端重新下载离线页。");
+        return;
+    }
+
+    // -- localStorage(file:// 下部分浏览器不可用,全部 try/catch) ---------------
+
+    let storageOk = true;
+    function readStore(key) {
+        try {
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) { storageOk = false; return null; }
+    }
+    function writeStore(key, value) {
+        try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+        catch (e) { storageOk = false; return false; }
+    }
+    if (storageOk) {
+        try {
+            localStorage.setItem(DRAFT_KEY + ":probe", "1");
+            localStorage.removeItem(DRAFT_KEY + ":probe");
+        } catch (e) { storageOk = false; }
+    }
+
+    // -- 数据源:装载的数据优先于嵌入数据;手动新增的记录单独持久 ----------------
+
+    const loaded = readStore(LOADED_KEY);
+    const active = (loaded && Array.isArray(loaded.templates) && loaded.templates.length) ? loaded : embedded;
+    const templates = active.templates || [];
+    const manualRecords = (readStore(MANUAL_KEY) || []).filter((rec) => rec && rec.sample_id);
+    const baseRecords = active.records || [];
+    const baseSampleIds = {};
+    for (const rec of baseRecords) baseSampleIds[rec.sample_id] = true;
+    // 装载的数据里已出现的编号,不再重复显示手动记录
+    const records = baseRecords.concat(manualRecords.filter((rec) => !baseSampleIds[rec.sample_id]));
+
+    const restored = readStore(DRAFT_KEY);
+    const draft = (restored && typeof restored.values === "object") ? restored : { savedAt: "", values: {} };
+
+    let saveTimer = null;
+    function saveDraftNow() {
+        saveTimer = null;
+        draft.savedAt = new Date().toISOString();
+        writeStore(DRAFT_KEY, draft);
+    }
+    function scheduleSave() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveDraftNow, 300);
+    }
+    // 切走/关闭前把未落的防抖写掉,尽量少丢
+    document.addEventListener("visibilitychange", () => { if (saveTimer !== null) saveDraftNow(); });
+    window.addEventListener("pagehide", () => { if (saveTimer !== null) saveDraftNow(); });
+
+    // -- 记录数据读写(嵌入/装载值 + 手机草稿的叠加视图) --------------------------
+
+    function recordKey(rec) { return rec.group_id || ("new:" + rec.sample_id); }
+    function templateOf(rec) { return templates.find((t) => t.id === rec.template_id) || null; }
+    function draftOf(rec) { return draft.values[recordKey(rec)] || null; }
+
+    function mergedShared(rec) {
+        const view = Object.assign({}, rec.shared || {});
+        const d = draftOf(rec);
+        if (d) Object.assign(view, d.shared || {});
+        return view;
+    }
+    function mergedSample(rec, index) {
+        const view = Object.assign({}, (rec.samples || [])[index] || {});
+        const d = draftOf(rec);
+        if (d && d.samples && d.samples[index]) Object.assign(view, d.samples[index]);
+        return view;
+    }
+    // 展示回落规则与电脑端一致:样品级读组级值、回落 samples[0];
+    // 按平行样第 1 行回落组级值(历史数据)
+    function sharedDisplayValue(rec, fieldId) {
+        const shared = mergedShared(rec);
+        if (EF.hasValue(shared[fieldId])) return shared[fieldId];
+        return mergedSample(rec, 0)[fieldId];
+    }
+    function sampleDisplayValue(rec, fieldId, index) {
+        const sample = mergedSample(rec, index);
+        if (EF.hasValue(sample[fieldId])) return sample[fieldId];
+        return index === 0 ? mergedShared(rec)[fieldId] : undefined;
+    }
+
+    function setDraftValue(rec, fieldId, sampleIndex, isShared, value) {
+        const key = recordKey(rec);
+        const entry = draft.values[key] || (draft.values[key] = { shared: {}, samples: {} });
+        if (isShared) entry.shared[fieldId] = value;
+        else (entry.samples[sampleIndex] || (entry.samples[sampleIndex] = {}))[fieldId] = value;
+        scheduleSave();
+    }
+
+    // 手机上填了几项(徽标 + 导出范围都以此为准;只数非空草稿值)
+    function filledCount(rec) {
+        const d = draftOf(rec);
+        if (!d) return 0;
+        let count = 0;
+        for (const id in d.shared || {}) if (EF.hasValue(d.shared[id])) count++;
+        for (const index in d.samples || {}) {
+            const sample = d.samples[index];
+            for (const id in sample) if (EF.hasValue(sample[id])) count++;
+        }
+        return count;
+    }
+
+    // -- 渲染 -------------------------------------------------------------------
+
+    function banner(kind, html) {
+        const el = document.createElement("div");
+        el.className = "offline-banner is-" + kind;
+        el.innerHTML = html;
+        document.getElementById("offline-banners").appendChild(el);
+    }
+
+    function fieldLabelHtml(field) {
+        return escapeHtml(field.name)
+            + (field.unit ? ' <span class="fld-unit">(' + escapeHtml(field.unit) + ")</span>" : "")
+            + (field.required ? ' <em class="fld-required">*</em>' : "");
+    }
+
+    function inputHtml(field, value, sampleIndex, isShared) {
+        const common = 'data-field-id="' + escapeHtml(field.id) + '" data-sample-index="' + sampleIndex + '"'
+            + (isShared ? ' data-shared="1"' : "");
+        const text = value === undefined || value === null ? "" : value;
+        if (field.type === "calc") {
+            return '<input type="text" ' + common + ' class="fld-calc" value="'
+                + escapeHtml(EF.formatNumber(value, field.decimals)) + '" readonly tabindex="-1">';
+        }
+        if (field.type === "select") {
+            const options = (field.options || [])
+                .map((opt) => '<option value="' + escapeHtml(opt) + '"' + (String(text) === opt ? " selected" : "") + ">" + escapeHtml(opt) + "</option>")
+                .join("");
+            return "<select " + common + '><option value="">请选择</option>' + options + "</select>";
+        }
+        // number 用 text + inputmode:file:// 页面里 type=number 在部分手机
+        // 浏览器上对粘贴/负号限制多,校验交给电脑端导入
+        const typeAttr = field.type === "number" ? 'type="text" inputmode="decimal"'
+            : field.type === "date" ? 'type="date"'
+            : field.type === "datetime" ? 'type="datetime-local"'
+            : 'type="text"';
+        return "<input " + typeAttr + " " + common + ' value="' + escapeHtml(text) + '">';
+    }
+
+    function formHtml(rec) {
+        const template = templateOf(rec);
+        if (!template) return '<p class="offline-form-error">字段模板缺失,请重新装载数据。</p>';
+        const fields = template.fields || [];
+        const buckets = [];
+        for (const field of fields) {
+            const name = field.group || "其他";
+            let bucket = buckets.find((b) => b.name === name);
+            if (!bucket) { bucket = { name: name, shared: [], rows: [] }; buckets.push(bucket); }
+            (field.shared ? bucket.shared : bucket.rows).push(field);
+        }
+        const channels = (rec.registration && rec.registration.channels) || [];
+        const count = rec.sample_count || 1;
+        const parts = [];
+        for (const bucket of buckets) {
+            parts.push('<section class="offline-band"><h4>' + escapeHtml(bucket.name) + "</h4>");
+            for (const field of bucket.shared) {
+                parts.push('<label class="fld"><span>' + fieldLabelHtml(field) + "</span>"
+                    + inputHtml(field, sharedDisplayValue(rec, field.id), 0, true) + "</label>");
+            }
+            if (bucket.rows.length) {
+                for (let index = 0; index < count; index++) {
+                    const channel = channels[index] ? "(通道 " + escapeHtml(channels[index]) + ")" : "";
+                    parts.push('<div class="offline-parallel"><h5>平行样 ' + (index + 1) + " " + channel + "</h5>");
+                    for (const field of bucket.rows) {
+                        parts.push('<label class="fld"><span>' + fieldLabelHtml(field) + "</span>"
+                            + inputHtml(field, sampleDisplayValue(rec, field.id, index), index, false) + "</label>");
+                    }
+                    parts.push("</div>");
+                }
+            }
+            parts.push("</section>");
+        }
+        return parts.join("");
+    }
+
+    function badgeHtml(rec) {
+        const count = filledCount(rec);
+        if (count > 0) return '<span class="offline-badge is-filled">已填 ' + count + " 项</span>";
+        return '<span class="offline-badge">未填写</span>';
+    }
+
+    function cardHtml(rec, index) {
+        const reg = rec.registration || {};
+        const chips = [];
+        if (reg.pn) chips.push("PN:" + escapeHtml(reg.pn));
+        if (reg.test_status) chips.push(escapeHtml(reg.test_status));
+        if (reg.registered_date) chips.push("登记 " + escapeHtml(reg.registered_date));
+        if (rec.manual) chips.push("手动新增");
+        return '<section class="offline-card" data-record-index="' + index + '">'
+            + '<button class="offline-card-head" type="button">'
+            + '<span class="offline-card-id">' + escapeHtml(rec.sample_id || "(无编号)") + "</span>"
+            + '<span class="offline-card-meta">' + chips.map((c) => "<span>" + c + "</span>").join("") + "</span>"
+            + '<span class="offline-card-badge">' + badgeHtml(rec) + "</span>"
+            + "</button>"
+            + '<div class="offline-card-body" hidden></div>'
+            + "</section>";
+    }
+
+    function refreshBadge(card, rec) {
+        card.querySelector(".offline-card-badge").innerHTML = badgeHtml(rec);
+    }
+
+    // 输入后即时刷新计算字段(与电脑端同一公式引擎;电脑端导入时仍会权威重算)
+    function refreshCalc(card, rec) {
+        const template = templateOf(rec);
+        if (!template) return;
+        const fields = template.fields || [];
+        card.querySelectorAll(".fld-calc").forEach((input) => {
+            const field = fields.find((f) => f.id === input.dataset.fieldId);
+            if (!field) return;
+            const index = parseInt(input.dataset.sampleIndex, 10) || 0;
+            const valueOf = EF.makeValueOf(mergedShared(rec), mergedSample(rec, index), fields);
+            const value = valueOf(field.id);
+            input.value = value === null || isNaN(value) ? "" : EF.formatNumber(value, field.decimals);
+        });
+    }
+
+    function bindCard(card, rec) {
+        const head = card.querySelector(".offline-card-head");
+        const body = card.querySelector(".offline-card-body");
+        head.addEventListener("click", () => {
+            const expanded = card.classList.toggle("is-expanded");
+            if (expanded && !body.dataset.rendered) {
+                // 表单较大,首次展开才渲染
+                body.innerHTML = formHtml(rec);
+                body.dataset.rendered = "1";
+                refreshCalc(card, rec);
+            }
+            body.hidden = !expanded;
+        });
+        const onEdit = (event) => {
+            const el = event.target;
+            if (!el.dataset || !el.dataset.fieldId || el.classList.contains("fld-calc")) return;
+            setDraftValue(rec, el.dataset.fieldId, parseInt(el.dataset.sampleIndex, 10) || 0, !!el.dataset.shared, el.value);
+            refreshCalc(card, rec);
+            refreshBadge(card, rec);
+        };
+        body.addEventListener("input", onEdit);
+        // select/date 在部分手机浏览器只发 change 不发 input
+        body.addEventListener("change", onEdit);
+    }
+
+    // -- 装载数据(扫码/粘贴 SCINF 分块) -----------------------------------------
+
+    // 分块头:SCINF|序号|总数|base64片段(见 _mobile_logic.qr_chunks_for_payload)
+    const CHUNK_RE = /SCINF\|(\d+)\|(\d+)\|([A-Za-z0-9+/=]+)/g;
+    const collectedChunks = {};
+    let chunkTotal = 0;
+
+    function collectChunksFrom(text) {
+        let added = 0;
+        let match;
+        CHUNK_RE.lastIndex = 0;
+        while ((match = CHUNK_RE.exec(String(text || ""))) !== null) {
+            const index = parseInt(match[1], 10);
+            const total = parseInt(match[2], 10);
+            if (total !== chunkTotal) { // 换了一批新码,重新收集
+                if (chunkTotal !== 0) for (const key in collectedChunks) delete collectedChunks[key];
+                chunkTotal = total;
+            }
+            if (!collectedChunks[index]) { collectedChunks[index] = match[3]; added++; }
+        }
+        return added;
+    }
+    function chunksComplete() {
+        if (!chunkTotal) return false;
+        for (let i = 1; i <= chunkTotal; i++) if (!collectedChunks[i]) return false;
+        return true;
+    }
+    function chunkStatusText() {
+        if (!chunkTotal) return "尚未识别到装载数据";
+        const have = Object.keys(collectedChunks).length;
+        const missing = [];
+        for (let i = 1; i <= chunkTotal; i++) if (!collectedChunks[i]) missing.push(i);
+        return "已收集 " + have + "/" + chunkTotal + (missing.length ? "(缺第 " + missing.join("、") + " 个)" : "");
+    }
+
+    async function inflateChunks() {
+        let encoded = "";
+        for (let i = 1; i <= chunkTotal; i++) encoded += collectedChunks[i];
+        const binary = atob(encoded);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        if (typeof DecompressionStream === "undefined") {
+            throw new Error("当前浏览器过旧(不支持解压),请换 Chrome 或系统自带浏览器");
+        }
+        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate"));
+        const buffer = await new Response(stream).arrayBuffer();
+        return JSON.parse(new TextDecoder().decode(buffer));
+    }
+
+    async function applyLoadedData() {
+        const payload = await inflateChunks();
+        if (!payload || payload.format !== "sc-inf-offline-page" || payload.version !== 1
+            || !Array.isArray(payload.templates) || !payload.templates.length) {
+            throw new Error("装载内容不完整或格式不对,请重新生成二维码");
+        }
+        if (!writeStore(LOADED_KEY, payload)) {
+            throw new Error("本机存储不可用,无法保存装载的数据");
+        }
+        saveDraftNow();
+        window.location.reload();
+    }
+
+    let scanStream = null;
+    let scanTimer = null;
+    function stopScan() {
+        clearInterval(scanTimer);
+        scanTimer = null;
+        if (scanStream) { scanStream.getTracks().forEach((t) => t.stop()); scanStream = null; }
+        document.getElementById("offline-scan-area").hidden = true;
+    }
+    async function startScan() {
+        const statusEl = document.getElementById("offline-load-status");
+        try {
+            const detector = new BarcodeDetector({ formats: ["qr_code"] });
+            scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            const video = document.getElementById("offline-scan-video");
+            video.srcObject = scanStream;
+            await video.play();
+            document.getElementById("offline-scan-area").hidden = false;
+            scanTimer = setInterval(async () => {
+                try {
+                    const codes = await detector.detect(video);
+                    let added = 0;
+                    for (const code of codes) added += collectChunksFrom(code.rawValue);
+                    if (added) statusEl.textContent = chunkStatusText();
+                    if (chunksComplete()) {
+                        stopScan();
+                        statusEl.textContent = "识别完成,正在装载…";
+                        await applyLoadedData();
+                    }
+                } catch (e) { /* 单帧识别失败忽略,下一帧继续 */ }
+            }, 350);
+        } catch (e) {
+            stopScan();
+            statusEl.textContent = "无法打开摄像头(" + (e && e.message ? e.message : "未知原因")
+                + ")。请改用微信等扫码后复制文本,粘贴到上方输入框。";
+        }
+    }
+
+    // -- 手动新增记录 -------------------------------------------------------------
+
+    function addManualRecord(sampleId, templateId) {
+        const rec = {
+            kind: "new", manual: true, group_id: null,
+            sample_id: sampleId, template_id: templateId,
+            base_updated_at: null, shared: {}, samples: [{}],
+            sample_count: 1, registration: {},
+        };
+        manualRecords.push(rec);
+        writeStore(MANUAL_KEY, manualRecords);
+        window.location.reload();
+    }
+
+    // -- 导出 -------------------------------------------------------------------
+
+    function exportValues(fields, values) {
+        // 只带非空、非 calc 的草稿值;number 字段能解析就转数字(与电脑端
+        // 录入页写库口径一致),解析不了原样带走、由导入预览人工核对
+        const out = {};
+        for (const id in values || {}) {
+            const value = values[id];
+            if (!EF.hasValue(value)) continue;
+            const field = fields.find((f) => f.id === id);
+            if (!field || field.type === "calc") continue;
+            if (field.type === "number") {
+                const n = parseFloat(value);
+                out[id] = isNaN(n) ? value : n;
+            } else {
+                out[id] = value;
+            }
+        }
+        return out;
+    }
+
+    function buildExportPayload() {
+        const out = [];
+        for (const rec of records) {
+            const d = draftOf(rec);
+            if (!d) continue;
+            const template = templateOf(rec);
+            if (!template) continue;
+            const fields = template.fields || [];
+            const shared = exportValues(fields, d.shared);
+            const sampleIndexes = Object.keys(d.samples || {}).map((k) => parseInt(k, 10)).filter((n) => !isNaN(n));
+            const samples = [];
+            if (sampleIndexes.length) {
+                const maxIndex = Math.max.apply(null, sampleIndexes);
+                for (let i = 0; i <= maxIndex; i++) samples.push(exportValues(fields, (d.samples || {})[i]));
+            }
+            const hasData = Object.keys(shared).length || samples.some((s) => Object.keys(s).length);
+            if (!hasData) continue;
+            out.push({
+                group_id: rec.group_id || null,
+                sample_id: rec.sample_id,
+                template_id: rec.template_id,
+                base_updated_at: rec.base_updated_at || null,
+                shared: shared,
+                samples: samples,
+            });
+        }
+        if (!out.length) return null;
+        return {
+            format: "sc-inf-mobile-records",
+            version: 1,
+            page_generated_at: active.generated_at || "",
+            exported_at: new Date().toISOString(),
+            source_user: active.generated_by || { employee_id: "", name: "" },
+            records: out,
+        };
+    }
+
+    let toastTimer = null;
+    function toast(message) {
+        const el = document.getElementById("offline-toast");
+        el.textContent = message;
+        el.hidden = false;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
+    }
+
+    function timestampText() {
+        const d = new Date();
+        const pad = (n) => (n < 10 ? "0" : "") + n;
+        return "" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "_" + pad(d.getHours()) + pad(d.getMinutes());
+    }
+
+    function doExport() {
+        if (saveTimer !== null) saveDraftNow();
+        const payload = buildExportPayload();
+        if (!payload) { toast("尚未填写任何内容"); return; }
+        const json = JSON.stringify(payload, null, 1);
+        try {
+            const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "实验记录_" + (payload.source_user.employee_id || "手机") + "_" + timestampText() + ".json";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 3000);
+            toast("已导出 " + payload.records.length + " 条记录,请到手机下载目录查看");
+        } catch (e) {
+            toast("导出失败,请用「复制为文本」");
+        }
+    }
+
+    function doCopy() {
+        if (saveTimer !== null) saveDraftNow();
+        const payload = buildExportPayload();
+        if (!payload) { toast("尚未填写任何内容"); return; }
+        const json = JSON.stringify(payload);
+        const panel = document.getElementById("offline-copy-panel");
+        const textarea = panel.querySelector("textarea");
+        textarea.value = json;
+        panel.hidden = false;
+        textarea.focus();
+        textarea.select();
+        textarea.setSelectionRange(0, json.length);
+        const done = () => toast("已复制,可粘贴到电脑端「手机同步」页的导入文本框");
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(json).then(done, () => {
+                // file:// 下 clipboard API 常不可用,回落老接口;再不行由用户长按全选复制
+                try { document.execCommand("copy") ? done() : toast("请长按文本框内容手动复制"); }
+                catch (e) { toast("请长按文本框内容手动复制"); }
+            });
+        } else {
+            try { document.execCommand("copy") ? done() : toast("请长按文本框内容手动复制"); }
+            catch (e) { toast("请长按文本框内容手动复制"); }
+        }
+    }
+
+    function clearDraft() {
+        if (!window.confirm("确定清除本页的全部草稿吗?已导出的文件不受影响。")) return;
+        draft.values = {};
+        saveDraftNow();
+        window.location.reload();
+    }
+
+    // -- 初始化 -----------------------------------------------------------------
+
+    function formatDateTime(iso) { return String(iso || "").replace("T", " ").slice(0, 16); }
+
+    // savedAt 是 toISOString 的 UTC 时间,展示时转回本地时区
+    function formatLocalTime(iso) {
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return formatDateTime(iso);
+        const pad = (n) => (n < 10 ? "0" : "") + n;
+        return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate())
+            + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+    }
+
+    const metaBits = [];
+    if (active.generated_by && active.generated_by.name) {
+        metaBits.push(active.generated_by.name + " · " + (loaded === active ? "装载" : "生成") + "于 " + formatDateTime(active.generated_at));
+        metaBits.push("共 " + records.length + " 条待录记录");
+    } else if (embedded.shell) {
+        metaBits.push("空壳版 · 尚未装载数据");
+    }
+    document.getElementById("offline-meta").textContent = metaBits.join(" · ");
+
+    if (!storageOk) {
+        banner("warn", "当前浏览器无法保存本机草稿(隐私模式或文件预览)。请填写完成后<strong>立即导出</strong>,中途不要关闭或刷新页面。");
+    } else if (restored && restored.savedAt) {
+        banner("info", "已恢复本机草稿(保存于 " + escapeHtml(formatLocalTime(restored.savedAt)) + ")。");
+    }
+
+    const list = document.getElementById("offline-record-list");
+    if (!records.length) {
+        list.innerHTML = '<div class="offline-empty">'
+            + (templates.length
+                ? "当前没有待录入的记录。可点右上角「手动新增」直接录一条。"
+                : "尚未装载数据。点右上角「装载数据」,扫电脑「手机同步」页上的二维码。")
+            + "</div>";
+    } else {
+        list.innerHTML = records.map((rec, index) => cardHtml(rec, index)).join("");
+        list.querySelectorAll(".offline-card").forEach((card) => {
+            bindCard(card, records[parseInt(card.dataset.recordIndex, 10)]);
+        });
+    }
+
+    // 装载面板
+    const loadPanel = document.getElementById("offline-load-panel");
+    document.getElementById("offline-load-open").addEventListener("click", () => { loadPanel.hidden = false; });
+    document.getElementById("offline-load-close").addEventListener("click", () => { stopScan(); loadPanel.hidden = true; });
+    document.getElementById("offline-load-parse").addEventListener("click", async () => {
+        collectChunksFrom(document.getElementById("offline-load-text").value);
+        const statusEl = document.getElementById("offline-load-status");
+        statusEl.textContent = chunkStatusText();
+        if (chunksComplete()) {
+            try { statusEl.textContent = "正在装载…"; await applyLoadedData(); }
+            catch (e) { statusEl.textContent = e.message || "装载失败"; }
+        }
+    });
+    const scanBtn = document.getElementById("offline-load-scan");
+    if ("BarcodeDetector" in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        scanBtn.addEventListener("click", startScan);
+    } else {
+        scanBtn.hidden = true;
+        document.getElementById("offline-load-scan-hint").textContent =
+            "此浏览器不支持页内扫码:请用微信「扫一扫」逐个扫码,把识别出的文本复制粘贴到上面的输入框(多个码的文本连着粘即可)。";
+    }
+    if (loaded) {
+        const resetBtn = document.getElementById("offline-load-reset");
+        resetBtn.hidden = false;
+        resetBtn.addEventListener("click", () => {
+            if (!window.confirm("清除已装载的数据?草稿会保留。")) return;
+            try { localStorage.removeItem(LOADED_KEY); } catch (e) { /* 忽略 */ }
+            window.location.reload();
+        });
+    }
+
+    // 手动新增面板
+    const manualPanel = document.getElementById("offline-manual-panel");
+    const manualTemplate = document.getElementById("offline-manual-template");
+    manualTemplate.innerHTML = templates
+        .map((t) => '<option value="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) + "</option>")
+        .join("");
+    document.getElementById("offline-manual-open").addEventListener("click", () => {
+        if (!templates.length) { toast("请先装载数据(需要字段模板)"); return; }
+        manualPanel.hidden = false;
+        document.getElementById("offline-manual-id").focus();
+    });
+    document.getElementById("offline-manual-close").addEventListener("click", () => { manualPanel.hidden = true; });
+    document.getElementById("offline-manual-add").addEventListener("click", () => {
+        const sampleId = document.getElementById("offline-manual-id").value.trim();
+        if (!sampleId) { toast("请填写样品编号"); return; }
+        if (records.some((rec) => rec.sample_id === sampleId)) { toast("该编号已在列表中"); return; }
+        addManualRecord(sampleId, manualTemplate.value);
+    });
+
+    document.getElementById("offline-export").addEventListener("click", doExport);
+    document.getElementById("offline-copy").addEventListener("click", doCopy);
+    document.getElementById("offline-clear").addEventListener("click", clearDraft);
+    document.querySelector("#offline-copy-panel .offline-copy-close").addEventListener("click", () => {
+        document.getElementById("offline-copy-panel").hidden = true;
+    });
+})();
+</script>
+</body>
+</html>

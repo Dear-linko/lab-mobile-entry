@@ -1,4 +1,4 @@
-const CACHE = "sc-inf-shell-cfbe21b40bfe";
+const CACHE = "sc-inf-shell-698ff08da715";
 self.addEventListener("install", (event) => {
     event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(["./"])));
     self.skipWaiting();
